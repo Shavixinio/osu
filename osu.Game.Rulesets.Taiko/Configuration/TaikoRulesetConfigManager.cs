@@ -23,6 +23,7 @@ namespace osu.Game.Rulesets.Taiko.Configuration
 
     public enum TaikoRulesetSetting
     {
-        TouchControlScheme
+        TouchControlScheme,
+        HitObjectAnimation
     }
 }
