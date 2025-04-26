@@ -18,6 +18,7 @@ namespace osu.Game.Rulesets.Taiko.Configuration
             base.InitialiseDefaults();
 
             SetDefault(TaikoRulesetSetting.TouchControlScheme, TaikoTouchControlScheme.KDDK);
+            SetDefault(TaikoRulesetSetting.HitObjectAnimation, true);
         }
     }
 
