@@ -4,139 +4,47 @@
 using System;
 using System.Linq;
 using NUnit.Framework;
-using osu.Framework.Allocation;
-using osu.Framework.Extensions.ObjectExtensions;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Cursor;
 using osu.Framework.Input;
-using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.Database;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Overlays;
-using osu.Game.Overlays.Toolbar;
-using osu.Game.Rulesets;
+using osu.Game.Online.Chat;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Osu.Mods;
-using osu.Game.Screens;
-using osu.Game.Screens.Footer;
-using osu.Game.Screens.Menu;
 using osu.Game.Screens.Select.Filter;
-using osu.Game.Screens.SelectV2;
-using osu.Game.Tests.Resources;
+using FilterControl = osu.Game.Screens.SelectV2.FilterControl;
+using NoResultsPlaceholder = osu.Game.Screens.SelectV2.NoResultsPlaceholder;
 
 namespace osu.Game.Tests.Visual.SongSelectV2
 {
-    public partial class TestSceneSongSelectFiltering : ScreenTestScene
+    public partial class TestSceneSongSelectFiltering : SongSelectTestScene
     {
-        private BeatmapManager manager = null!;
-        private RealmRulesetStore rulesets = null!;
-
-        private OsuConfigManager config = null!;
-
-        private SoloSongSelect songSelect = null!;
-        private BeatmapCarousel carousel => songSelect.ChildrenOfType<BeatmapCarousel>().Single();
-
-        private FilterControl filter => songSelect.ChildrenOfType<FilterControl>().Single();
-        private ShearedFilterTextBox filterTextBox => songSelect.ChildrenOfType<ShearedFilterTextBox>().Single();
+        private FilterControl filter => SongSelect.ChildrenOfType<FilterControl>().Single();
+        private ShearedFilterTextBox filterTextBox => SongSelect.ChildrenOfType<ShearedFilterTextBox>().Single();
         private int filterOperationsCount;
 
-        [Cached]
-        private readonly ScreenFooter screenFooter;
-
-        [Cached]
-        private readonly OsuLogo logo;
-
-        [Cached(typeof(INotificationOverlay))]
-        private readonly INotificationOverlay notificationOverlay = new NotificationOverlay();
-
-        public TestSceneSongSelectFiltering()
+        protected override void LoadSongSelect()
         {
-            Children = new Drawable[]
+            base.LoadSongSelect();
+
+            AddStep("hook filter event", () =>
             {
-                new PopoverContainer
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Children = new Drawable[]
-                    {
-                        new Toolbar
-                        {
-                            State = { Value = Visibility.Visible },
-                        },
-                        screenFooter = new ScreenFooter
-                        {
-                            OnBack = () => Stack.CurrentScreen.Exit(),
-                        },
-                        logo = new OsuLogo
-                        {
-                            Alpha = 0f,
-                        },
-                    },
-                },
-            };
-
-            Stack.Padding = new MarginPadding { Top = Toolbar.HEIGHT };
-        }
-
-        [BackgroundDependencyLoader]
-        private void load(GameHost host)
-        {
-            RealmDetachedBeatmapStore beatmapStore;
-
-            // These DI caches are required to ensure for interactive runs this test scene doesn't nuke all user beatmaps in the local install.
-            // At a point we have isolated interactive test runs enough, this can likely be removed.
-            Dependencies.Cache(rulesets = new RealmRulesetStore(Realm));
-            Dependencies.Cache(Realm);
-            Dependencies.Cache(manager = new BeatmapManager(LocalStorage, Realm, null, Audio, Resources, host, Beatmap.Default));
-            Dependencies.CacheAs<BeatmapStore>(beatmapStore = new RealmDetachedBeatmapStore());
-
-            Add(beatmapStore);
-
-            Dependencies.Cache(config = new OsuConfigManager(LocalStorage));
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            Stack.ScreenPushed += updateFooter;
-            Stack.ScreenExited += updateFooter;
-        }
-
-        public override void SetUpSteps()
-        {
-            base.SetUpSteps();
-
-            AddStep("reset defaults", () =>
-            {
-                Ruleset.Value = new OsuRuleset().RulesetInfo;
-
-                Beatmap.SetDefault();
-                SelectedMods.SetDefault();
-
-                config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Title);
-                config.SetValue(OsuSetting.SongSelectGroupingMode, GroupMode.All);
-
-                songSelect = null!;
                 filterOperationsCount = 0;
+                filter.CriteriaChanged += _ => filterOperationsCount++;
             });
-
-            AddStep("delete all beatmaps", () => manager.Delete());
         }
 
         [Test]
         public void TestSingleFilterOnEnter()
         {
-            importBeatmapForRuleset(0);
-            importBeatmapForRuleset(0);
+            ImportBeatmapForRuleset(0);
+            ImportBeatmapForRuleset(0);
 
-            loadSongSelect();
+            LoadSongSelect();
 
             AddAssert("filter count is 0", () => filterOperationsCount, () => Is.EqualTo(0));
         }
@@ -144,62 +52,62 @@ namespace osu.Game.Tests.Visual.SongSelectV2
         [Test]
         public void TestNoFilterOnSimpleResume()
         {
-            importBeatmapForRuleset(0);
-            importBeatmapForRuleset(0);
+            ImportBeatmapForRuleset(0);
+            ImportBeatmapForRuleset(0);
 
-            loadSongSelect();
+            LoadSongSelect();
 
             AddStep("push child screen", () => Stack.Push(new TestSceneOsuScreenStack.TestScreen("test child")));
-            waitForSuspension();
+            WaitForSuspension();
 
-            AddStep("return", () => songSelect.MakeCurrent());
-            AddUntilStep("wait for current", () => songSelect.IsCurrentScreen());
+            AddStep("return", () => SongSelect.MakeCurrent());
+            AddUntilStep("wait for current", () => SongSelect.IsCurrentScreen());
             AddAssert("filter count is 0", () => filterOperationsCount, () => Is.EqualTo(0));
         }
 
         [Test]
         public void TestFilterOnResumeAfterChange()
         {
-            importBeatmapForRuleset(0);
-            importBeatmapForRuleset(0);
+            ImportBeatmapForRuleset(0);
+            ImportBeatmapForRuleset(0);
 
-            AddStep("change convert setting", () => config.SetValue(OsuSetting.ShowConvertedBeatmaps, false));
+            AddStep("change convert setting", () => Config.SetValue(OsuSetting.ShowConvertedBeatmaps, false));
 
-            loadSongSelect();
+            LoadSongSelect();
 
             AddStep("push child screen", () => Stack.Push(new TestSceneOsuScreenStack.TestScreen("test child")));
-            waitForSuspension();
+            WaitForSuspension();
 
-            AddStep("change convert setting", () => config.SetValue(OsuSetting.ShowConvertedBeatmaps, true));
+            AddStep("change convert setting", () => Config.SetValue(OsuSetting.ShowConvertedBeatmaps, true));
 
-            AddStep("return", () => songSelect.MakeCurrent());
-            AddUntilStep("wait for current", () => songSelect.IsCurrentScreen());
+            AddStep("return", () => SongSelect.MakeCurrent());
+            AddUntilStep("wait for current", () => SongSelect.IsCurrentScreen());
             AddAssert("filter count is 1", () => filterOperationsCount, () => Is.EqualTo(1));
         }
 
         [Test]
         public void TestSorting()
         {
-            loadSongSelect();
-            addManyTestMaps();
+            LoadSongSelect();
+            AddManyTestMaps();
 
             // TODO: old test has this step, but there doesn't seem to be any purpose for it.
             // AddUntilStep("random map selected", () => Beatmap.Value != defaultBeatmap);
 
-            AddStep(@"Sort by Artist", () => config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Artist));
-            AddStep(@"Sort by Title", () => config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Title));
-            AddStep(@"Sort by Author", () => config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Author));
-            AddStep(@"Sort by DateAdded", () => config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.DateAdded));
-            AddStep(@"Sort by BPM", () => config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.BPM));
-            AddStep(@"Sort by Length", () => config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Length));
-            AddStep(@"Sort by Difficulty", () => config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Difficulty));
-            AddStep(@"Sort by Source", () => config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Source));
+            AddStep(@"Sort by Artist", () => Config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Artist));
+            AddStep(@"Sort by Title", () => Config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Title));
+            AddStep(@"Sort by Author", () => Config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Author));
+            AddStep(@"Sort by DateAdded", () => Config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.DateAdded));
+            AddStep(@"Sort by BPM", () => Config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.BPM));
+            AddStep(@"Sort by Length", () => Config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Length));
+            AddStep(@"Sort by Difficulty", () => Config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Difficulty));
+            AddStep(@"Sort by Source", () => Config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Source));
         }
 
         [Test]
         public void TestCutInFilterTextBox()
         {
-            loadSongSelect();
+            LoadSongSelect();
 
             AddStep("set filter text", () => filterTextBox.Current.Value = "nonono");
             AddStep("select all", () => InputManager.Keys(PlatformAction.SelectAll));
@@ -211,9 +119,9 @@ namespace osu.Game.Tests.Visual.SongSelectV2
         [Test]
         public void TestNonFilterableModChange()
         {
-            importBeatmapForRuleset(0);
+            ImportBeatmapForRuleset(0);
 
-            loadSongSelect();
+            LoadSongSelect();
 
             // Mod that is guaranteed to never re-filter.
             AddStep("add non-filterable mod", () => SelectedMods.Value = new Mod[] { new OsuModCinema() });
@@ -227,12 +135,12 @@ namespace osu.Game.Tests.Visual.SongSelectV2
         [Test]
         public void TestFilterableModChange()
         {
-            importBeatmapForRuleset(3);
+            ImportBeatmapForRuleset(3);
 
-            loadSongSelect();
+            LoadSongSelect();
 
             // Change to mania ruleset.
-            AddStep("filter to mania ruleset", () => Ruleset.Value = rulesets.AvailableRulesets.First(r => r.OnlineID == 3));
+            AddStep("filter to mania ruleset", () => Ruleset.Value = Rulesets.AvailableRulesets.First(r => r.OnlineID == 3));
             AddAssert("filter count is 1", () => filterOperationsCount, () => Is.EqualTo(1));
 
             // Apply a mod, but this should NOT re-filter because there's no search text.
@@ -264,69 +172,104 @@ namespace osu.Game.Tests.Visual.SongSelectV2
             AddAssert("filter count is 5", () => filterOperationsCount, () => Is.EqualTo(5));
         }
 
-        private void loadSongSelect()
+        [Test]
+        public void TestPlaceholderVisibleAfterDeleteAll()
         {
-            AddStep("load screen", () => Stack.Push(songSelect = new SoloSongSelect()));
-            AddUntilStep("wait for load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
-            AddStep("hook events", () =>
-            {
-                filterOperationsCount = 0;
-                filter.CriteriaChanged += _ => filterOperationsCount++;
-            });
+            LoadSongSelect();
+
+            AddUntilStep("wait for placeholder visible", () => getPlaceholder()?.State.Value == Visibility.Visible);
+
+            ImportBeatmapForRuleset(0);
+            AddUntilStep("wait for placeholder hidden", () => getPlaceholder()?.State.Value == Visibility.Hidden);
+
+            AddStep("delete all beatmaps", () => Beatmaps.Delete());
+            AddUntilStep("wait for placeholder visible", () => getPlaceholder()?.State.Value == Visibility.Visible);
         }
 
-        private void importBeatmapForRuleset(int rulesetId)
+        [Test]
+        public void TestPlaceholderVisibleAfterStarDifficultyFilter()
         {
-            int beatmapsCount = 0;
+            ImportBeatmapForRuleset(0);
+            AddStep("change star filter", () => Config.SetValue(OsuSetting.DisplayStarsMinimum, 10.0));
 
-            AddStep($"import test map for ruleset {rulesetId}", () =>
-            {
-                beatmapsCount = songSelect.IsNull() ? 0 : carousel.Filters.OfType<BeatmapCarouselFilterGrouping>().Single().SetItems.Count;
-                manager.Import(TestResources.CreateTestBeatmapSetInfo(3, rulesets.AvailableRulesets.Where(r => r.OnlineID == rulesetId).ToArray()));
-            });
+            LoadSongSelect();
 
-            // This is specifically for cases where the add is happening post song select load.
-            // For cases where song select is null, the assertions are provided by the load checks.
-            AddUntilStep("wait for imported to arrive in carousel", () => songSelect.IsNull() || carousel.Filters.OfType<BeatmapCarouselFilterGrouping>().Single().SetItems.Count > beatmapsCount);
+            AddUntilStep("wait for placeholder visible", () => getPlaceholder()?.State.Value == Visibility.Visible);
+
+            AddStep("click link in placeholder", () => getPlaceholder().ChildrenOfType<DrawableLinkCompiler>().First().TriggerClick());
+
+            AddUntilStep("star filter reset", () => Config.Get<double>(OsuSetting.DisplayStarsMinimum) == 0.0);
+            AddUntilStep("wait for placeholder visible", () => getPlaceholder()?.State.Value == Visibility.Hidden);
         }
 
-        private void changeRuleset(int rulesetId)
+        [Test]
+        public void TestPlaceholderVisibleWithConvertSetting()
         {
-            AddStep($"change ruleset to {rulesetId}", () => Ruleset.Value = rulesets.AvailableRulesets.First(r => r.OnlineID == rulesetId));
+            ImportBeatmapForRuleset(0);
+            AddStep("change convert setting", () => Config.SetValue(OsuSetting.ShowConvertedBeatmaps, false));
+
+            LoadSongSelect();
+
+            ChangeRuleset(2);
+
+            AddUntilStep("wait for placeholder visible", () => getPlaceholder()?.State.Value == Visibility.Visible);
+
+            AddStep("click link in placeholder", () => getPlaceholder().ChildrenOfType<DrawableLinkCompiler>().First().TriggerClick());
+
+            AddUntilStep("convert setting changed", () => Config.Get<bool>(OsuSetting.ShowConvertedBeatmaps));
+            AddUntilStep("wait for placeholder visible", () => getPlaceholder()?.State.Value == Visibility.Hidden);
         }
 
-        /// <summary>
-        /// Imports test beatmap sets to show in the carousel.
-        /// </summary>
-        /// <param name="difficultyCountPerSet">
-        /// The exact count of difficulties to create for each beatmap set.
-        /// A <see langword="null"/> value causes the count of difficulties to be selected randomly.
-        /// </param>
-        private void addManyTestMaps(int? difficultyCountPerSet = null)
+        [Test]
+        public void TestCorrectMatchCountAfterDeleteAll()
         {
-            AddStep("import test maps", () =>
-            {
-                var usableRulesets = rulesets.AvailableRulesets.Where(r => r.OnlineID != 2).ToArray();
+            LoadSongSelect();
+            checkMatchedBeatmaps(0);
 
-                for (int i = 0; i < 10; i++)
-                    manager.Import(TestResources.CreateTestBeatmapSetInfo(difficultyCountPerSet, usableRulesets));
-            });
+            ImportBeatmapForRuleset(0);
+            checkMatchedBeatmaps(3);
+
+            AddStep("delete all beatmaps", () => Beatmaps.Delete());
+            checkMatchedBeatmaps(0);
         }
 
-        private void waitForSuspension() => AddUntilStep("wait for not current", () => !songSelect.AsNonNull().IsCurrentScreen());
-
-        private void updateFooter(IScreen? _, IScreen? newScreen)
+        [Test]
+        public void TestCorrectMatchCountAfterHardDelete()
         {
-            if (newScreen is IOsuScreen osuScreen && osuScreen.ShowFooter)
-            {
-                screenFooter.Show();
-                screenFooter.SetButtons(osuScreen.CreateFooterButtons());
-            }
-            else
-            {
-                screenFooter.Hide();
-                screenFooter.SetButtons(Array.Empty<ScreenFooterButton>());
-            }
+            LoadSongSelect();
+            checkMatchedBeatmaps(0);
+
+            ImportBeatmapForRuleset(0);
+            checkMatchedBeatmaps(3);
+
+            AddStep("hard delete beatmap", () => Realm.Write(r => r.RemoveRange(r.All<BeatmapSetInfo>().Where(s => !s.Protected))));
+            checkMatchedBeatmaps(0);
         }
+
+        [Test]
+        public void TestHideBeatmap()
+        {
+            LoadSongSelect();
+            ImportBeatmapForRuleset(0);
+
+            checkMatchedBeatmaps(3);
+
+            // song select should automatically select the beatmap for us but this is not implemented yet.
+            // todo: remove when that's the case.
+            AddAssert("no beatmap selected", () => Beatmap.IsDefault);
+            AddStep("select beatmap", () => Beatmap.Value = Beatmaps.GetWorkingBeatmap(Beatmaps.GetAllUsableBeatmapSets().Single().Beatmaps.First()));
+
+            AddStep("hide", () => Beatmaps.Hide(Beatmap.Value.BeatmapInfo));
+
+            checkMatchedBeatmaps(2);
+
+            AddStep("restore", () => Beatmaps.Restore(Beatmap.Value.BeatmapInfo));
+
+            checkMatchedBeatmaps(3);
+        }
+
+        private NoResultsPlaceholder? getPlaceholder() => SongSelect.ChildrenOfType<NoResultsPlaceholder>().FirstOrDefault();
+
+        private void checkMatchedBeatmaps(int expected) => AddUntilStep($"{expected} matching shown", () => Carousel.MatchedBeatmapsCount, () => Is.EqualTo(expected));
     }
 }

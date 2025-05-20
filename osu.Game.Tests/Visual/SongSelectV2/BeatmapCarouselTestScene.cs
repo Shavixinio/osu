@@ -4,9 +4,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -35,7 +37,7 @@ namespace osu.Game.Tests.Visual.SongSelectV2
     {
         protected readonly BindableList<BeatmapSetInfo> BeatmapSets = new BindableList<BeatmapSetInfo>();
 
-        protected BeatmapCarousel Carousel = null!;
+        protected TestBeatmapCarousel Carousel = null!;
 
         protected OsuScrollContainer<Drawable> Scroll => Carousel.ChildrenOfType<OsuScrollContainer<Drawable>>().Single();
 
@@ -48,6 +50,8 @@ namespace osu.Game.Tests.Visual.SongSelectV2
         private OsuTextFlowContainer stats = null!;
 
         private int beatmapCount;
+
+        protected int NewItemsPresentedInvocationCount;
 
         protected BeatmapCarouselTestScene()
         {
@@ -65,6 +69,8 @@ namespace osu.Game.Tests.Visual.SongSelectV2
         {
             AddStep("create components", () =>
             {
+                NewItemsPresentedInvocationCount = 0;
+
                 Box topBox;
                 Children = new Drawable[]
                 {
@@ -96,8 +102,9 @@ namespace osu.Game.Tests.Visual.SongSelectV2
                             },
                             new Drawable[]
                             {
-                                Carousel = new BeatmapCarousel
+                                Carousel = new TestBeatmapCarousel
                                 {
+                                    NewItemsPresented = () => NewItemsPresentedInvocationCount++,
                                     BleedTop = 50,
                                     BleedBottom = 50,
                                     Anchor = Anchor.Centre,
@@ -133,12 +140,12 @@ namespace osu.Game.Tests.Visual.SongSelectV2
             SortBy(SortMode.Title);
         }
 
-        protected void SortBy(SortMode mode) => ApplyToFilter($"sort by {mode.ToString().ToLowerInvariant()}", c => c.Sort = mode);
-        protected void GroupBy(GroupMode mode) => ApplyToFilter($"group by {mode.ToString().ToLowerInvariant()}", c => c.Group = mode);
+        protected void SortBy(SortMode mode) => ApplyToFilter($"sort by {mode.GetDescription().ToLowerInvariant()}", c => c.Sort = mode);
+        protected void GroupBy(GroupMode mode) => ApplyToFilter($"group by {mode.GetDescription().ToLowerInvariant()}", c => c.Group = mode);
 
         protected void SortAndGroupBy(SortMode sort, GroupMode group)
         {
-            ApplyToFilter($"sort by {sort.ToString().ToLowerInvariant()} & group by {group.ToString().ToLowerInvariant()}", c =>
+            ApplyToFilter($"sort by {sort.GetDescription().ToLowerInvariant()} & group by {group.GetDescription().ToLowerInvariant()}", c =>
             {
                 c.Sort = sort;
                 c.Group = group;
@@ -344,6 +351,22 @@ namespace osu.Game.Tests.Visual.SongSelectV2
                 {
                     cp.Font = cp.Font.With(size: 18, weight: FontWeight.Bold);
                 });
+            }
+        }
+
+        public partial class TestBeatmapCarousel : BeatmapCarousel
+        {
+            public IEnumerable<BeatmapInfo> PostFilterBeatmaps = null!;
+
+            protected override Task<IEnumerable<CarouselItem>> FilterAsync()
+            {
+                var filterAsync = base.FilterAsync();
+                filterAsync.ContinueWith(result =>
+                {
+                    if (result.IsCompletedSuccessfully)
+                        PostFilterBeatmaps = result.GetResultSafely().Select(i => i.Model).OfType<BeatmapInfo>();
+                });
+                return filterAsync;
             }
         }
     }
