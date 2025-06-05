@@ -62,7 +62,7 @@ namespace osu.Game.Overlays.Mods
                             {
                                 new OsuSpriteText
                                 {
-                                    Text = "One or more values are being adjusted by mods that change speed.",
+                                    Text = "One or more values are being adjusted by mods.",
                                 },
                                 attributesFillFlow = new FillFlowContainer
                                 {
@@ -85,9 +85,9 @@ namespace osu.Game.Overlays.Mods
             if (data != null)
             {
                 attemptAdd("CS", bd => bd.CircleSize);
-                attemptAdd("HP", bd => bd.DrainRate);
-                attemptAdd("OD", bd => bd.OverallDifficulty);
                 attemptAdd("AR", bd => bd.ApproachRate);
+                attemptAdd("OD", bd => bd.OverallDifficulty);
+                attemptAdd("HP", bd => bd.DrainRate);
             }
 
             if (attributesFillFlow.Any())

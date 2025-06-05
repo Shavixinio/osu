@@ -17,6 +17,7 @@ using osu.Framework.Layout;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osuTK;
@@ -163,7 +164,8 @@ namespace osu.Game.Screens.SelectV2
                             Text = "...",
                             Colour = colourProvider.Background4,
                             Font = OsuFont.Style.Caption1.With(weight: FontWeight.Bold),
-                        }
+                        },
+                        new HoverClickSounds(),
                     };
                 }
 
@@ -192,7 +194,7 @@ namespace osu.Game.Screens.SelectV2
             public partial class TagsOverflowPopover : OsuPopover
             {
                 private readonly string[] tags;
-                private readonly SongSelect? songSelect;
+                private readonly ISongSelect? songSelect;
 
                 public TagsOverflowPopover(string[] tags, SongSelect? songSelect)
                 {
